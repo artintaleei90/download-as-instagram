@@ -6,24 +6,33 @@ from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import uvicorn
 
+# ------------------ تنظیم لاگ ------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.getenv("8274514106:AAFb4cTiB7eSqUlIHQQBGzK4YUTyNpsCRqo")  # توکن ربات تلگرام
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://download-as-instagram.onrender.com")
+# ------------------ خواندن توکن و وبهوک ------------------
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("توکن ربات پیدا نشد! لطفاً BOT_TOKEN را در Environment Variables ست کن.")
+
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+if not WEBHOOK_URL:
+    raise ValueError("وبهوک پیدا نشد! لطفاً WEBHOOK_URL را در Environment Variables ست کن.")
+
 PORT = int(os.getenv("PORT", 8000))
 
+# ------------------ ساخت ربات و FastAPI ------------------
 bot = Bot(BOT_TOKEN)
 app = FastAPI()
 application = Application.builder().token(BOT_TOKEN).build()
 
-
-# /start command
+# ------------------ /start command ------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام 👋 لینک ویدیو یا عکس اینستاگرام رو بفرست تا برات دانلود کنم.")
+    await update.message.reply_text(
+        "سلام 👋 لینک ویدیو یا عکس اینستاگرام رو بفرست تا برات دانلود کنم."
+    )
 
-
-# گرفتن لینک ویدیو از کاربر
+# ------------------ هندل کردن پیام ------------------
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
@@ -32,7 +41,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        # استفاده از snapinsta.app به عنوان واسط
         api_url = f"https://api.snapinsta.app/api.php?url={text}"
         res = requests.get(api_url).json()
 
@@ -40,17 +48,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             video_url = res["url"]
             await update.message.reply_video(video=video_url, caption="اینجا ویدیوت 🎥")
         else:
-            await update.message.reply_text("نتونستم دانلود کنم 😔 دوباره تلاش کن یا لینک دیگه بفرست.")
+            await update.message.reply_text(
+                "نتونستم دانلود کنم 😔 دوباره تلاش کن یا لینک دیگه بفرست."
+            )
     except Exception as e:
         logger.error(e)
         await update.message.reply_text("خطا در دانلود ویدیو ❌")
 
-
-# هندلرها
+# ------------------ اضافه کردن هندلرها ------------------
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-
+# ------------------ مسیر وبهوک ------------------
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
@@ -58,13 +67,12 @@ async def webhook(request: Request):
     await application.process_update(update)
     return {"ok": True}
 
-
+# ------------------ ست کردن وبهوک در startup ------------------
 @app.on_event("startup")
 async def startup_event():
-    # ست کردن webhook روی تلگرام
     await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
-    logger.info("Webhook set.")
+    logger.info("Webhook set successfully.")
 
-
+# ------------------ اجرای uvicorn ------------------
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=PORT)
