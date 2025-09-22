@@ -1,4 +1,4 @@
-python-telegram-bot==20.6
 fastapi
+python-telegram-bot==20.8
+requests
 uvicorn
-httpx
